@@ -1,0 +1,167 @@
+1. Zadatak. Izracunati predikciju za kolonu REVENUE za mesec novembar i decembar 2017.
+Za resavanje zadatka moguce je koristiti sve metode koje su radjene na casu.
+Dodatno, zadatak se moze koristiti primenom regresije.
+Opsta ideja jeste da se napravi struktura sa nekoliko zakasnjenih dana serije, 
+kao i neke druge vrednosti koje smatrate da mogu biti bitne za predikciju.
+Ove vrednosti mogu se koristiti u modelima za regresiju kao sto je Support Vector Regression.
+
+import pandas as pd
+import numpy as np 
+import matplotlib.pyplot as plt
+#import seaborn as sns
+%matplotlib inline
+#%pylab
+
+data = pd.read_csv('drugi_kolokvijum.csv', header = 0, parse_dates=[0], index_col=0, squeeze=True)
+data['Date'] = pd.to_datetime(data['Date'])
+data.index = data.Date
+
+data.Revenue = data.Revenue.fillna(0)
+data.Revenue = data.Revenue.astype('float')
+data.Occupancy = data.Occupancy.fillna(0)
+data.Occupancy = data.Occupancy.astype('float')
+
+data.Occupancy.head()
+
+type(data['Date'])
+
+plt.plot(data.Revenue)
+
+weekly = data.Occupancy.rolling(7).mean()
+
+weekly.plot()
+
+weekly=data.Occupancy.resample('W').mean()
+
+weekly.plot()
+
+y = data.Occupancy.as_matrix()
+
+plt.plot(y)
+
+# create rolling statistics features
+from pandas import Series
+from pandas import DataFrame
+from pandas import concat
+
+series = DataFrame(data.Occupancy)
+width = 3
+shifted = series.shift(width-2)
+window = shifted.rolling(window = width)
+
+dataframe = concat ([ window.min(), window.mean(), window.max(), series  ], axis =1)
+dataframe.columns =  ['min',  'mean', 'max', 't+1'  ] 
+print( dataframe.head(5) )
+
+data.Revenue
+
+from statsmodels.tsa.ar_model import AR
+from sklearn.metrics import mean_squared_error
+from math import sqrt
+import numpy as np
+import matplotlib.pyplot as plt
+
+x = data.Revenue.values
+
+train1 = x[900:1000]
+test1  = x[1000:1096]
+
+model = AR(train1)
+model_fit = model.fit()
+predictions1 = model_fit.predict(start =len(train1), end = len(train1)+len(test1)-1, dynamic=False)
+predictions1
+
+plt.plot(train1)
+plt.plot(predictions1, c='r')
+
+rmse_AR = sqrt(mean_squared_error(test1, predictions1))
+
+rmse_AR
+
+from sklearn.svm import SVR
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
+
+svr_novembar = SVR(C=100)
+
+svr_novembar.fit(train[1:].reshape(-1, 1), pd.Series(data=train).shift(1).values[1:])
+
+from matplotlib import pyplot
+from statsmodels.tsa.arima_model import ARIMA
+
+X = data.Revenue.values
+
+train, test = X[900:1000], X[1000:1096]
+
+size
+
+history = [x for x in train]
+predictions = list()
+for t in range(len(test)):
+    model = ARIMA(history, order=(4,1,0))
+    model_fit = model.fit(disp=0)
+    output = model_fit.forecast()
+    yhat = output[0]
+
+    predictions.append(yhat)
+    obs = test[t]
+    history.append(obs)
+
+plt.plot(train)
+plt.plot(predictions, c='r')
+
+rmse_ARIMA = sqrt(mean_squared_error(test, predictions))
+
+rmse_ARIMA
+
+values = DataFrame(data.Revenue.values)
+dataframe = concat( [values.shift(1), values], axis=1)
+
+X3 = dataframe.values
+
+train3, test3 = X3[900:1000], X3[1000:1096]
+
+train_X , train_y = train3[:,0], train3[:,1]
+test_X, test_y = test3 [:,0], test3 [:,1]
+
+def model_persistence(x):
+    return x
+
+predictions3 = list()
+for x in test_X:
+    yhat = model_persistence(x)
+    predictions3.append(yhat)
+pyplot.plot(test_y)
+pyplot.plot(predictions3)
+
+rmse_Persistance = sqrt(mean_squared_error(test_y, predictions3))
+rmse_Persistance
+def difference(dataset, interval=1):
+    diff = list()
+    for i in range(interval, len(dataset)):
+        value = dataset[i] - dataset[i - interval]
+        diff.append(value)
+    return np.array(diff)
+ 
+
+def inverse_difference(history, yhat, interval=1):
+    return yhat + history[-interval]
+
+
+X = data.Revenue.values
+days_in_year = 365
+differenced = difference(X, days_in_year)
+
+model = ARIMA(differenced, order=(7,0,1))
+model_fit = model.fit(disp=0)
+
+forecast = model_fit.forecast(steps=61)[0]
+
+history = [x for x in X]
+day = 1
+predictions_novembar_decembar = list()
+for yhat in forecast:
+    inverted = inverse_difference(history, yhat, days_in_year)
+    predictions_novembar_decembar.append(inverted)
+    print('%f' % (inverted))
+    day += 1
