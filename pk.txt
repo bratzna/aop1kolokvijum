@@ -1,0 +1,149 @@
+1.1 Definisite niz od 100 neuredjenih elemenata.
+Koristeci for petlju prikazite sve elemente ovog niza tako sto cete svake iteracije petlje biti ispisan po jedan element.
+1.2. Iscrtati ovaj niz naredbom stem(). 
+1.3. Nacrtati histogram. Proceniti srednju vrednost niza na osnovu histograma. 
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from pandas.tools.plotting import autocorrelation_plot, lag_plot
+from pandas import Series
+from pandas import DataFrame
+from pandas import TimeGrouper
+from matplotlib import pyplot
+from pandas import concat
+
+
+
+x = np.random.randn(100)
+
+for i in range(len(x)):
+    print(x[i])
+plt.stem(x)
+plt.hist(x)
+
+
+2. Ucitati 'pollution_small' datase
+
+pollution_dataset = pd.read_csv('pollution_small.csv')
+pollution_dataset.head()
+pollution_dataset = pollution_dataset.drop('soot', axis=1)
+
+3. Za vremensku seriju iz zadatka 2, nacrtati autokorelacionu funkciju. Sta se moze zakljuciti na osnovu ovog grafika ?
+Komentarisati. 3.2. Napraviti nove 'signale' koji su dobijeni kada se orignialni signal zakasni za jedan, tri i pet dana.
+Nacrtati lag_plot grafike. Uporediti grafike. Komentarisati.
+
+p.pm10['2009']
+p.pm10.describe()
+
+
+one_year = p.pm10['2009']
+groups = one_year.groupby(TimeGrouper('M'))
+months = concat([DataFrame(x[1].values) for x in groups], axis = 1)
+months = DataFrame(months)
+months.columns = range(1,13)
+months.boxplot()
+
+//import pandas as pd----
+//import numpy as np----
+import matplotlib.pyplot as plt---
+from pandas.tools.plotting import autocorrelation_plot, lag_plot---
+autocorrelation_plot(pollution_dataset.pm10)
+
+pm10_original = pollution_dataset.pm10
+
+pm_10_za_jedan = pm10_original.shift(1)
+pm_10_za_tri = pm10_original.shift(3)
+pm_10_za_pet = pm10_original.shift(5)
+
+lag_plot(pm_10_za_jedan)
+lag_plot(pm_10_za_tri)
+lag_plot(pm_10_za_pet)
+#Tokom vremena rasipanje tacaka je sve vece, linearna zavisnost postoji ali nije jaka
+
+4.1. Iz cele vremenske serije odrediti najumereniju/srednju koncentraciju za period od 7 uzastopnih dana. 
+4.2. Koristeci kalendar pronaci koji dani su vikendi - subota i nedelja. Koji vikend (i subota i nedelja) su bili sa najnizom koncentracijom cestice koju ispitujete? 
+4.3. Pronaci max-imalnu vrednost cele vremenske serije. Koliki je najduzi niz uzastopnih dana u kojima je vrednost koncentracije cestice bila manja od 20% od maksimalne vrednosti? Kog datuma je pocela ta serija ?
+
+windowed = pm10_original.rolling(7)
+windowed.mean().argmin()
+windowed.mean()[520]
+print("Period najumererenijeg zagadjenja je bio ovih datuma: ", pollution_dataset.iloc[520-7:520].Date.values)
+
+prva_subota = '1/3/2009'
+prva_nedelja = '1/4/2009'
+poslednja_subota = '12/27/2014'
+poslednja_nedelja = '12/28/2014'
+
+subote_ids = []
+subote_ids.append(3)
+nedelje_ids = []
+nedelje_ids.append(4)
+trenutni_id = 3
+trenutni_id2 = 4
+
+while trenutni_id <= len(pollution_dataset) - 7:
+    temp = trenutni_id + 7
+    subote_ids.append(temp)
+    trenutni_id = temp
+
+while trenutni_id2 <= len(pollution_dataset) - 7:
+    temp = trenutni_id2 + 7
+    nedelje_ids.append(temp)
+    trenutni_id2 = temp
+
+vikendi = []
+assert len(subote_ids) == len(nedelje_ids)
+for i in range(len(subote_ids)):
+    vikendi.append(subote_ids[i])
+    vikendi.append(nedelje_ids[i])
+
+cestice_vikendi = pm10_original.values[vikendi[:-1]]
+
+min_vikend = -1
+temp_min = 1e400
+for i in range(0, len(cestice_vikendi), 2):
+    cur_min = sum(cestice_vikendi[i:i+2])
+    if cur_min < temp_min:
+        min_vikend = i
+        temp_min = cur_min
+
+cestice_vikendi[min_vikend:min_vikend+2]
+
+print("Vikend sa minimalnom temperaturom je: {}".format(pollution_dataset.Date.values[[499, 500]]))
+
+max_value = pm10_original.max()
+max_value
+part_of_max = max_value*20.0/100
+part_of_max
+
+ids = []
+temp_ids = []
+len_of_ids = 0
+for i in range(len(pm10_original)):
+    if pm10_original.values[i] < part_of_max:
+        temp_ids.append(i)
+    elif pm10_original.values[i] > part_of_max:
+        if len(temp_ids) > len(ids):
+            ids = temp_ids
+            len_of_ids = len(ids)
+            temp_ids = []
+        else:
+            temp_ids = []
+
+print("Najduzi period kada je kolicina ove cestice bila manja od 20% od maksimalne kolicine je: {}".format(len_of_ids))
+print("Dan kad je poceo ovaj period je  {} i zavrsio se {}.".format(pollution_dataset.Date.values[ids[0]], pollution_dataset.Date.values[ids[-1]]))
+
+5.1. Analiziranu seriju dekomponovati na odgovarajuce signale. Iscrati ove signale. 
+5.2. Da li uocavate neka zapazanja ? Koliki je Level, Trend, Seasonality ?
+5.3. Zasto se vrsi dekompozicija ?
+
+from statsmodels.tsa.seasonal import seasonal_decompose
+to_series = pd.Series(pm10_original.values)
+result = seasonal_decompose(pm10_original.values, model='additive', freq=1)
+result.plot()
+plt.show()
+
+result.trend
+result.seasonal
+result.resid
