@@ -1,0 +1,110 @@
+Analizirati dataset, “pollution_small” i to vremensku seriju koju cete odrediti po sledecoj formuli
+# N unesite poslednju cifru vaseg index broja.
+# U komentaru upisite i ceo broj indexa radi provere !
+N = 0
+vremenska_serija =  N % 3
+# 0 - pm10
+# 1 - no2
+#2 – so2
+Predloziti model koji ce generisati najmanju RMSE gresku za mesec juli u poslednjoj godini kada su podaci dostupni. 
+Pretpostaviti da su podaci dostupni za taj mesec u toku analize – dakle moze se primeniti i model persistence.
+Generisane rezultate sacuvati za mesec juli i poslati na email zajedno sa kodom. 
+
+Sa platforme Kaggle.com preuzeti dataset Titanic train i test.
+Ucitati datu .csv tabelu
+Pripremiti podatke da je moguce korsititi ih u modelima za klasifikaciju
+Prikazati odredjene kolone graficki i komentarisati sta se moze zakljuciti sa grafika
+Predloziti model koji ce uraditi predikciju na test datasetu. 
+Zajedno sa kodom poslati i primer predikcije za kolonu Survival na test datasetu.
+
+
+from pandas import Series
+import pandas as pd
+import numpy as np 
+import matplotlib.pyplot as plt
+%matplotlib inline
+from statsmodels.tsa.ar_model import AR
+from sklearn.metrics import mean_squared_error
+from math import sqrt
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib import pyplot
+from statsmodels.tsa.arima_model import ARIMA
+from  sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.model_selection import train_test_split
+
+data = pd.read_csv('pollution_small.csv', header = 0,)
+data['Date'] = pd.to_datetime(data['Date'])
+data.index = data.Date
+data.head(10)
+
+so2=Series(data=data['so2'].values,index=data.Date)
+so2_jul=Series(so2['2014-07'])
+
+train=(so2['2014-06'])
+test=(so2['2014-07'])
+model = AR(train)
+model_fit = model.fit()
+predictionsAR = model_fit.predict(start =len(train), end = len(train)+len(test)-1, dynamic=False)
+predictionsAR
+
+predictionsAR.to_csv('predikcije.csv')
+rmse_AR = sqrt(mean_squared_error(test, predictionsAR))
+rmse_AR
+
+predictions = list()
+history = list(train)
+for t in range(len(test)):
+    model = ARIMA(history, order=(5,2,0))
+    model_fit = model.fit(disp=0)
+    output = model_fit.forecast()
+    yhat = output[0]
+
+    predictions.append(yhat)
+    obs = test[t]
+    history.append(obs)
+    print('predicted=%f, expected=%f' % (yhat, obs))
+rmse = sqrt(mean_squared_error(test, predictions))
+print('Test RMSE: %.3f' % rmse)
+pyplot.plot(test)
+pyplot.plot(predictions, color='black')
+
+data1 = pd.read_csv('train.csv')
+data1.head()
+
+target = data1.Survived.values
+data1.Sex = np.where(data1.Sex == 'male', 0, 1)
+data1.reset_index(inplace=True, drop=True)
+len(data1.Embarked)
+
+len(data1.Embarked) == len(pd.factorize(data1.Embarked.values)[0])
+
+t_niz = pd.factorize(data1.Embarked.values)[0]
+data1.Embarked = t_niz
+data1.head()
+
+features = data1.drop(['PassengerId'], axis=1)
+features.drop(["Cabin", "Ticket", "Name", "Parch"], axis=1, inplace=True)
+features.dropna(axis=0, inplace=True)
+
+targets = features.iloc[:, 0].values
+features = features.iloc[:, 1:].values
+
+LDA=LinearDiscriminantAnalysis()
+X_train, X_test, y_train, y_test = train_test_split(features, targets, test_size=0.2)
+LDA.fit(X_train, y_train)
+
+preds = LDA.predict(X_test)
+sum(preds == y_test) / len(y_test)
+
+data1['Survived'].value_counts().plot.pie()
+#veci je broj umrlih nego prezivelih
+
+data1['Sex'].value_counts().plot.pie()
+#prezivelo je vise zena nego muskaraca
+
+data1[['Sex','Survived']].groupby(['Sex']).mean().plot.bar()
+#zene su imale vece sanse za prezivaljavanje, oznacene nulom
+
+data1[data1['Survived']==1].Age.plot.hist(bins = 20)
+#prema godinama mladji su imali vece sanse da prezive
